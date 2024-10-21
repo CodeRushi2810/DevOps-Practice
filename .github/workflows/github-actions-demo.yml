@@ -1,0 +1,30 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Salesforce CLI
+      run: npm install -g sfdx-cli
+
+    - name: Authenticate with Salesforce
+      id: auth
+      run: |
+        ACCESS_TOKEN=$(curl -s -X POST https://login.salesforce.com/services/oauth2/token \
+            -d "grant_type=client_credentials" \
+            -d "client_id=${{ secrets.CONSUMER_KEY }}" \
+            -d "client_secret=${{ secrets.CONSUMER_SECRET }}" | jq -r '.access_token')
+        echo "access_token=$ACCESS_TOKEN" >> $GITHUB_ENV
+
+    - name: Deploy to Salesforce
+      run: |
+        sfdx force:source:deploy -p path/to/your/source --targetusername YOUR_SF_USERNAME --setdefaultusername
