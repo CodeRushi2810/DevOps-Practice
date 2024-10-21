@@ -27,4 +27,4 @@ jobs:
 
     - name: Deploy to Salesforce
       run: |
-        sfdx project deploy start -p path/to/your/source --targetusername YOUR_SF_USERNAME
+        sfdx project deploy start -p path/to/your/source --targetusername patelrushi2810@gmail.com
