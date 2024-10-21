@@ -23,8 +23,8 @@ jobs:
             -d "grant_type=client_credentials" \
             -d "client_id=${{ secrets.CONSUMER_KEY }}" \
             -d "client_secret=${{ secrets.CONSUMER_SECRET }}" | jq -r '.access_token')
-        echo "access_token=$ACCESS_TOKEN" >> $GITHUB_ENV
+        echo "ACCESS_TOKEN=$ACCESS_TOKEN" >> $GITHUB_ENV
 
     - name: Deploy to Salesforce
       run: |
-        sfdx force:source:deploy -p path/to/your/source --targetusername YOUR_SF_USERNAME --setdefaultusername
+        sfdx project deploy start -p path/to/your/source --targetusername YOUR_SF_USERNAME
