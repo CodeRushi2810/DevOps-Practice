@@ -25,6 +25,6 @@ jobs:
             -d "client_secret=${{ secrets.CONSUMER_SECRET }}" | jq -r '.access_token')
         echo "ACCESS_TOKEN=$ACCESS_TOKEN" >> $GITHUB_ENV
 
-    - name: Deploy to Salesforce
+    - name: Deploy to Salesforce1
       run: |
         sfdx project deploy start -p path/to/your/source --targetusername patelrushi2810@gmail.com
