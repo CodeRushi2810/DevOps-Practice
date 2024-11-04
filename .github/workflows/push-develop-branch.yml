@@ -43,7 +43,7 @@ jobs:
       
   build:
     runs-on: ubuntu-latest
-    environment: integration
+    environment: QA
     steps:
       # Checkout the Source code from the latest commit
       - uses: actions/checkout@v3
