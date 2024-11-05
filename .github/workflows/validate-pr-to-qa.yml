@@ -31,11 +31,12 @@ jobs:
           ~/cli/sf/bin/sf version
       - name: Decrypt the server.key.enc file & store inside assets folder
         run: |
-          ls
           openssl enc -nosalt -aes-256-cbc -d -in ${{ vars.ENCRYPTION_KEY_FILE }} -out ${{ vars.JWT_KEY_FILE }} -base64 -K ${{ secrets.DECRYPTION_KEY }} -iv ${{ secrets.DECRYPTION_IV }}
-          ls
       - name: Authenticate Salesforce ORG
         run: |
+          cd assets
+          ls
+          cd .
           sf org login jwt --username ${{ vars.HUB_USER_NAME }} --jwt-key-file ${{ vars.JWT_KEY_FILE }} --client-id ${{ secrets.HUB_CONSUMER_KEY }} --alias TargetOrgToDeploy
       - name: Installing sfdx git delta
         run: |
