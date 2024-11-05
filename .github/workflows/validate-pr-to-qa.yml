@@ -14,7 +14,6 @@ permissions:
 jobs:
   validate-pr-to-qa:
     runs-on: ubuntu-latest
-    environment: integration
     steps:
       - name: Checkout source code
         uses: actions/checkout@v4
@@ -35,7 +34,7 @@ jobs:
           openssl enc -nosalt -aes-256-cbc -d -in ${{ vars.ENCRYPTION_KEY_FILE }} -out ${{ vars.JWT_KEY_FILE }} -base64 -K ${{ secrets.DECRYPTION_KEY }} -iv ${{ secrets.DECRYPTION_IV }}
       - name: Authenticate Salesforce ORG
         run: |
-          sf org login jwt --username ${{ vars.HUB_USER_NAME }} --jwt-key-file ${{ vars.JWT_KEY_FILE }} --client-id ${{ secrets.HUB_CONSUMER_KEY }} --alias TargetOrgToDeploy
+          sfdx force:auth:jwt:grant -i ${{ secrets.HUB_CONSUMER_KEY }} -f ${{ vars.JWT_KEY_FILE }} --username ${{ vars.HUB_USER_NAME }}  -a HubOrg
       - name: Installing sfdx git delta
         run: |
           echo 'y' | sf plugins install "sfdx-git-delta@5.40.0"
