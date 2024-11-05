@@ -1,96 +1,78 @@
-name: QA PR
-run-name: Validating To QA, ${{ github.actor }} tiggered GitHub Actions 🚀
+name: Validate PR to QA
 on:
-  # The workflow will run whenever an event happens on a pull request
   pull_request:
-    # The events are that a PR is opened, or when a commit is pushed
-    # to a branch that has an existing pull request
     types: [opened, synchronize]
-    # The branches filter allows to specify that this workflow should only
-    # run if the branch name is "develop". This way we prevent this workflow
-    # from running when PRs are opened on other branches
-    branches: [ Integration ]
-    # We only care about changes to the force-app directory, which is the
-    # root directory of the sfdx project. This prevents the job from running
-    # when changing non-salesforce files (like this yml file).
     paths:
       - 'force-app/**'
+    branches: [ Integration ]
 
 permissions:
   actions: read
   contents: read
   security-events: write
-  
-jobs:
-  # This is the name of the job. You can give it whatever name you want
-  Explore-GitHub-Actions:
-     # This job runs inside a VM. Here we
-        # can specify which OS this VM should run on. 
-        # In this case, we are going to run our commands on the latest version
-        # of ubuntu
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo "🎉 The job was automatically triggered by a ${{ github.event_name }} event."
-      - run: echo "🐧 This job is now running on a ${{ runner.os }} server hosted by GitHub!"
-      - run: echo "🔎 The name of your branch path is ${{ github.ref }}, name is ${{ github.ref_name }} and your repository is ${{ github.repository }}."
-      - name: Check out repository code
-        uses: actions/checkout@v3
 
-      - run: echo "💡 The ${{ github.repository }} repository has been cloned to the runner."
-      - run: echo "🖥️ The workflow is now ready to test your code on the runner."
-      - name: List files in the repository
-        run: |
-          ls ${{ github.workspace }}
-      - run: echo "🍏 This job's status is ${{ job.status }}."
-      
-  build:
+jobs:
+  validate-pr-to-qa:
     runs-on: ubuntu-latest
     environment: integration
     steps:
-      # Checkout the Source code from the latest commit
-      - uses: actions/checkout@v3
+      - name: Checkout source code
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          
       - name: Install NPM
         run: |
           npm install --force
-          
-      # Now Install Salesforce CLI
-      - name: 'Install Salesforce CLI'
+      - name: Install Salesforce CLI
         run: |
-            wget https://developer.salesforce.com/media/salesforce-cli/sfdx/channels/stable/sfdx-linux-x64.tar.xz
-            mkdir ~/sfdx
-            tar xJf sfdx-linux-x64.tar.xz -C ~/sfdx --strip-components 1
-            echo "$HOME/sfdx/bin" >> $GITHUB_PATH
-            ~/sfdx/bin/sfdx version
-
-      - name: Install the sfdx-git-delta plugin
-        run: |
-          echo 'y' | sfdx plugins:install sfdx-git-delta
-                    
+          wget https://developer.salesforce.com/media/salesforce-cli/sf/channels/stable/sf-linux-x64.tar.xz
+          mkdir -p ~/cli/sf
+          tar xJf sf-linux-x64.tar.xz -C ~/cli/sf --strip-components 1
+          echo "$HOME/cli/sf/bin" >> $GITHUB_PATH
+          ~/cli/sf/bin/sf version
       - name: Decrypt the server.key.enc file & store inside assets folder
         run: |
           openssl enc -nosalt -aes-256-cbc -d -in ${{ vars.ENCRYPTION_KEY_FILE }} -out ${{ vars.JWT_KEY_FILE }} -base64 -K ${{ secrets.DECRYPTION_KEY }} -iv ${{ secrets.DECRYPTION_IV }}
-        # openssl enc -nosalt -aes-256-cbc -d -in ${{ vars.ENCRYPTION_KEY_FILE }} -out ${{ vars.JWT_KEY_FILE }} -base64 -K ${{ secrets.DECRYPTION_KEY }} -iv ${{ secrets.DECRYPTION_IV }}
-          
       - name: Authenticate Salesforce ORG
         run: |
-          sfdx force:auth:jwt:grant -i ${{ secrets.HUB_CONSUMER_KEY }} -f ${{ vars.JWT_KEY_FILE }} --username ${{ vars.HUB_USER_NAME }}  -a HubOrg
-      - name: Generate the package.xml for delta files
+          sf org login jwt --username ${{ vars.HUB_USER_NAME }} --jwt-key-file ${{ vars.JWT_KEY_FILE }} --client-id ${{ secrets.HUB_CONSUMER_KEY }} --alias TargetOrgToDeploy
+      - name: Installing sfdx git delta
+        run: |
+          echo 'y' | sf plugins install "sfdx-git-delta@5.40.0"
+          sf plugins
+      - name: Check for file changes
+        run: |
+          git log -n 2 --oneline
+          git diff HEAD~1 HEAD --name-only
+          git diff origin/Integration HEAD --name-only
+          echo "List of files changed in the PR:"
+      - name: Create delta packages for new, modified or deleted metadata
         run: |
           mkdir changed-sources
-          sfdx sgd:source:delta --to "HEAD" --from "HEAD^" --output changed-sources/ --generate-delta --source force-app/
-      
-      - name: validate Delta components to Salesofrce
+          sf sgd source delta  -t "HEAD" -f "origin/Integration" -o "changed-sources/" -d -s "force-app/" --loglevel trace --json
+          echo "Delta creation output:"
+          ls -al changed-sources/
+      - name: Installing java
+        run: sudo apt-get update && sudo apt-get install default-jdk
+      - name: Installing SFDX scanner
+        run: sf plugins install @salesforce/sfdx-scanner@v3.26.0
+      - name: Scan code
+        run: sf scanner run --format sarif --target 'changed-sources/**/*.cls' --category 'Best Practices,Security' --outfile 'changed-sources/apexScanResults.sarif'
+      - name: List files in changed-sources directory
         run: |
-          sfdx force:source:deploy -p "changed-sources/force-app" -u HubOrg --checkonly --testlevel NoTestRun --json      
-              
-    
-      - name: 'validate destructive changes (if any)'
-        run: sfdx force:mdapi:deploy -d "changed-sources/destructiveChanges" -u HubOrg --checkonly --testlevel NoTestRun --ignorewarnings 
+          ls -al changed-sources/
+          echo "List of files in force-app directory"
+          ls -al changed-sources/force-app/
+      - name: Upload SARIF file
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: changed-sources/apexScanResults.sarif
+      - name: Deployment - run no tests
+        run: |
+          echo "Listing files in changed-sources/force-app:"
+          ls -al changed-sources/force-app/
+          sf project deploy start --source-dir "changed-sources/force-app" --target-org TargetOrgToDeploy --test-level NoTestRun --json
 
-
-      #- name: Validate Source Code Against Salesforce ORG
-      #  run: |
-      #    sfdx force:source:deploy -p force-app -c -u HubOrg
+      - name: Validate destructive changes (if any)
+        run: |
+          sf project deploy start --metadata-dir "changed-sources/destructiveChanges" --target-org TargetOrgToDeploy --test-level NoTestRun --ignore-errors --dry-run
