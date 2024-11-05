@@ -14,7 +14,6 @@ permissions:
 jobs:
   validate-pr-to-qa:
     runs-on: ubuntu-latest
-    environment: integration
     steps:
       - name: Checkout source code
         uses: actions/checkout@v4
@@ -32,7 +31,9 @@ jobs:
           ~/cli/sf/bin/sf version
       - name: Decrypt the server.key.enc file & store inside assets folder
         run: |
+          ls
           openssl enc -nosalt -aes-256-cbc -d -in ${{ vars.ENCRYPTION_KEY_FILE }} -out ${{ vars.JWT_KEY_FILE }} -base64 -K ${{ secrets.DECRYPTION_KEY }} -iv ${{ secrets.DECRYPTION_IV }}
+          ls
       - name: Authenticate Salesforce ORG
         run: |
           sf org login jwt --username ${{ vars.HUB_USER_NAME }} --jwt-key-file ${{ vars.JWT_KEY_FILE }} --client-id ${{ secrets.HUB_CONSUMER_KEY }} --alias TargetOrgToDeploy
