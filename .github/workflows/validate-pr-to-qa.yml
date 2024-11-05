@@ -34,7 +34,7 @@ jobs:
           openssl enc -nosalt -aes-256-cbc -d -in ${{ vars.ENCRYPTION_KEY_FILE }} -out ${{ vars.JWT_KEY_FILE }} -base64 -K ${{ secrets.DECRYPTION_KEY }} -iv ${{ secrets.DECRYPTION_IV }}
       - name: Authenticate Salesforce ORG
         run: |
-          sf org login jwt --username ${{ vars.HUB_USER_NAME }} --jwt-key-file ${{ vars.JWT_KEY_FILE }} --client-id ${{ secrets.HUB_CONSUMER_KEY }} --alias TargetOrgToDeploy
+          sf org login jwt --username ${{ vars.HUB_USER_NAME }} --jwt-key-file ${{ vars.JWT_KEY_FILE }} --client-id 3MVG9fe4g9fhX0E7MujtMgIeTkn_y7jtn_6qgWnJFOzixnZRB.n_V8dlQeQ6GnKg0rbiK5VDta88UmTACvVjg --alias TargetOrgToDeploy
       - name: Installing sfdx git delta
         run: |
           echo 'y' | sf plugins install "sfdx-git-delta@5.40.0"
